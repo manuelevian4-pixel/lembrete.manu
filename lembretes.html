@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meus lembretes</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f6fb;--card:#fff;--tx:#1d2433;--mut:#5f6b80;--bd:#d8deea;--ac:#4f46e5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10131c;--card:#1a1f2d;--tx:#e8ecf5;--mut:#9aa6bd;--bd:#2c3446;--ac:#6366f1}}
+:root[data-theme="dark"]{--bg:#10131c;--card:#1a1f2d;--tx:#e8ecf5;--mut:#9aa6bd;--bd:#2c3446;--ac:#6366f1}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:560px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:8px 0 4px}
+h2{font-size:1.05rem;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:14px 0}
+.aviso{color:var(--mut);font-size:.88rem;margin:4px 0 0}
+input,select,button{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px;max-width:100%}
+input[type=checkbox]{width:22px;height:22px;padding:0}
+button{cursor:pointer}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0}
+.row>input[type=text]{flex:1 1 180px}
+label{display:flex;align-items:center;gap:8px}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--bd)}
+li span{flex:1;overflow-wrap:anywhere}
+li.ok span{text-decoration:line-through;color:var(--mut)}
+.x{padding:4px 10px}
+.alerta{position:fixed;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;background:var(--ac);color:#fff;padding:calc(20px + env(safe-area-inset-top,0px)) 20px calc(20px + env(safe-area-inset-bottom,0px))}
+.alerta[hidden]{display:none}
+.alerta p{font-size:1.6rem;font-weight:700;margin:0}
+.alerta button{background:#fff;color:#111;font-weight:700;padding:14px 32px}
+</style>
+</head>
+<body>
+<main>
+<h1>⏰ Meus lembretes</h1>
+<p class="aviso">Os avisos só tocam com esta página aberta. Deixe a tela ligada para o celular vibrar na hora.</p>
+
+<section class="card">
+<h2>Novo lembrete</h2>
+<div class="row">
+<button type="button" class="q" data-t="💧 Beber água" data-k="int" data-v="60">💧 Água</button>
+<button type="button" class="q" data-t="📚 Hora de estudar" data-k="hor" data-v="19:00">📚 Estudar</button>
+<button type="button" class="q" data-t="💼 Ir pro serviço" data-k="hor" data-v="07:30">💼 Serviço</button>
+</div>
+<div class="row">
+<input type="text" id="texto" placeholder="O que eu devo lembrar?" aria-label="Texto do lembrete">
+<select id="tipo" aria-label="Tipo"><option value="int">A cada X minutos</option><option value="hor">Todo dia em um horário</option></select>
+<input id="val" type="number" min="1" value="60" aria-label="Minutos ou horário">
+<button type="button" class="p" id="add">Adicionar</button>
+</div>
+<ul id="lemb"></ul>
+</section>
+
+<section class="card">
+<h2>Preciso estudar</h2>
+<div class="row"><input type="text" id="topico" placeholder="Ex: revisar arrays e DOM" aria-label="Assunto para estudar"><button type="button" class="p" id="addEst">Adicionar</button></div>
+<p class="aviso" id="cont"></p>
+<ul id="est"></ul>
+</section>
+
+<section class="card">
+<h2>Avisos no celular</h2>
+<div class="row">
+<button type="button" id="test">Testar aviso</button>
+<button type="button" id="perm">Ativar notificações</button>
+<label><input type="checkbox" id="tela"> Manter tela ligada</label>
+</div>
+<p class="aviso" id="msg"></p>
+</section>
+</main>
+
+<div class="alerta" id="alerta" hidden role="alertdialog" aria-live="assertive"><p id="alertaTxt"></p><button type="button" id="ok">OK, entendi!</button></div>
+
+<script>
+const $=s=>document.querySelector(s),K="lembretes-app-v1";
+let S={lemb:[],est:[]};
+try{const r=JSON.parse(localStorage.getItem(K));if(r&&r.lemb&&r.est)S=r}catch(e){}
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const msg=t=>{$("#msg").textContent=t};
+
+function linha(texto,marcado,riscar,rot,onCheck,onDel){
+ const li=document.createElement("li"),c=document.createElement("input"),s=document.createElement("span"),b=document.createElement("button");
+ c.type="checkbox";c.checked=marcado;c.onchange=onCheck;c.setAttribute("aria-label",rot);
+ s.textContent=texto;
+ b.textContent="✕";b.className="x";b.setAttribute("aria-label","Apagar");b.onclick=onDel;
+ if(riscar&&marcado)li.className="ok";
+ li.append(c,s,b);return li;
+}
+
+function render(){
+ $("#lemb").replaceChildren(...S.lemb.map(l=>linha(
+  l.texto+" — "+(l.k==="int"?"a cada "+l.v+" min":"todo dia às "+l.v),l.on,false,"Ativo",
+  e=>{l.on=e.target.checked;if(l.on)l.base=Date.now();save()},
+  ()=>{S.lemb=S.lemb.filter(x=>x.id!==l.id);save();render()})));
+ $("#est").replaceChildren(...S.est.map(t=>linha(t.t,t.f,true,"Feito",
+  e=>{t.f=e.target.checked;save();render()},
+  ()=>{S.est=S.est.filter(x=>x.id!==t.id);save();render()})));
+ const f=S.est.filter(t=>t.f).length;
+ $("#cont").textContent=S.est.length?f+" de "+S.est.length+" feitos":"Nada anotado ainda.";
+}
+
+const tipo=$("#tipo"),val=$("#val");
+function ajusta(k,v){tipo.value=k;val.type=k==="int"?"number":"time";val.value=v}
+tipo.onchange=()=>ajusta(tipo.value,tipo.value==="int"?"60":"19:00");
+document.querySelectorAll(".q").forEach(b=>{b.onclick=()=>{$("#texto").value=b.dataset.t;ajusta(b.dataset.k,b.dataset.v)}});
+
+$("#add").onclick=()=>{
+ const t=$("#texto").value.trim(),v=val.value;
+ if(!t||!v||(tipo.value==="int"&&Number(v)<1))return msg("Escreva o lembrete e o tempo ou horário.");
+ S.lemb.push({id:uid(),texto:t,k:tipo.value,v:tipo.value==="int"?String(Math.floor(Number(v))):v,on:true,base:Date.now(),dia:""});
+ save();render();$("#texto").value="";msg("");
+};
+$("#addEst").onclick=()=>{
+ const t=$("#topico").value.trim();if(!t)return;
+ S.est.push({id:uid(),t:t,f:false});$("#topico").value="";save();render();
+};
+
+function beep(){try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator();o.connect(c.destination);o.frequency.value=880;o.start();setTimeout(()=>{o.stop();c.close()},600)}catch(e){}}
+function disparar(txt){
+ try{if(navigator.vibrate)navigator.vibrate([400,150,400,150,800])}catch(e){}
+ beep();
+ try{if("Notification"in window&&Notification.permission==="granted")new Notification("⏰ Lembrete",{body:txt})}catch(e){}
+ $("#alertaTxt").textContent=txt;$("#alerta").hidden=false;
+}
+$("#ok").onclick=()=>{$("#alerta").hidden=true;try{if(navigator.vibrate)navigator.vibrate(0)}catch(e){}};
+$("#test").onclick=()=>disparar("Teste: se você ouviu e sentiu vibrar, está funcionando! 🎉");
+$("#perm").onclick=async()=>{
+ try{const r=await Notification.requestPermission();msg(r==="granted"?"Notificações ativadas. Em alguns celulares elas não aparecem, mas o aviso na tela sempre aparece.":"Notificações não permitidas.")}
+ catch(e){msg("Este navegador não suporta notificações. O aviso na tela continua funcionando.")}
+};
+
+function tick(){
+ const ag=new Date(),n=ag.getTime(),hoje=ag.toDateString();
+ S.lemb.forEach(l=>{
+  if(!l.on)return;
+  if(l.k==="int"){
+   if(n-l.base>=Number(l.v)*60000){l.base=n;save();disparar(l.texto)}
+  }else{
+   const p=l.v.split(":").map(Number),al=new Date(ag);al.setHours(p[0],p[1],0,0);
+   const d=n-al.getTime();
+   if(d>=0&&d<600000&&l.dia!==hoje){l.dia=hoje;save();disparar(l.texto)}
+  }
+ });
+}
+setInterval(tick,10000);
+
+let wl=null;
+async function pedeTela(){try{wl=await navigator.wakeLock.request("screen")}catch(e){$("#tela").checked=false;msg("Seu navegador não deixou manter a tela ligada.")}}
+$("#tela").onchange=async e=>{if(e.target.checked)await pedeTela();else{try{if(wl)await wl.release()}catch(x){}wl=null}};
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&$("#tela").checked)pedeTela()});
+
+render();
+</script>
+</body>
+</html>
